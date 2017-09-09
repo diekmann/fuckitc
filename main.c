@@ -20,25 +20,31 @@
 #error("Will likely not run on your arch")
 #endif
 
-void sa_sigsegv(int signum, siginfo_t *siginfo, void *ucontext_void){
-    ucontext_t *uctx = ucontext_void;
+/* Prelude for my signal handlers.
+ * Sanity checks, debug output.
+ * Return a pointer to the RIP stored in the machine context which will be restored on sigreturn.
+ */
+greg_t* sa_prelude(const int signum, const siginfo_t *const siginfo, const ucontext_t *const uctx){
     assert(signum == siginfo->si_signo);
     assert(signum == SIGSEGV);
 
     // Pointer to the place where all the cpu registers were saved when the exception occured
-    gregset_t *saved_registers = &uctx->uc_mcontext.gregs;
+    const gregset_t *const saved_registers = &uctx->uc_mcontext.gregs;
     // Pointer to the place where the instruction pointer which triggered the SEGV is saved
-    greg_t *rip = &(*saved_registers)[REG_RIP];
+    const greg_t *const rip = &(*saved_registers)[REG_RIP];
     // We need "Pointer to" so we can modify the struct which will later be used to restore the state of the cpu
 
     printf("Handling SIGSEGV. Invalid memory access to %p (Instruction pointer at %p)\n", siginfo->si_addr, (void *)*rip);
+    return (greg_t *) rip; //discards const qualifier
+}
+
+void sa_sigsegv(int signum, siginfo_t *siginfo, void *ucontext){
+    greg_t *rip = sa_prelude(signum, siginfo, ucontext);
 
     // only for invalid_ptr exaple
     assert(siginfo->si_code == SEGV_MAPERR); // address not mapped
     assert(siginfo->si_addr == (void*)0x42);
     // end invalid_ptr example
-
-    printf("%p\n", uctx->uc_link);
 
     //TODO investigate different contexts
     //ucontext_t ucp = {0};
