@@ -78,6 +78,37 @@ void sa_sigsegv(int signum, siginfo_t *siginfo, void *ucontext){
     printf("\tContinuing execution at %p\n", *rip);
 }
 
+void sa_sigill(int signum, siginfo_t *siginfo, void *ucontext){
+    assert(signum == siginfo->si_signo);
+    assert(signum == SIGILL);
+    greg_t *rip = get_pointer_to_saved_rip(ucontext);
+    printf("Handling SIGILL. Illegal instruction at %p (Instruction pointer at %p)\n", get_si_addr(signum, siginfo), (void *)*rip);
+    printf("\tsi_errno %d\n", siginfo->si_errno);
+
+    if(siginfo->si_code == ILL_ILLOPC){
+        printf("\tIllegal opcode.\n");
+    }else if(siginfo->si_code == ILL_ILLOPN){
+        printf("\tIllegal operand.\n");
+    }else if(siginfo->si_code == ILL_ILLADR){
+        printf("\tIllegal addressing mode.\n");
+    }else if(siginfo->si_code == ILL_ILLTRP){
+        printf("\tIllegal trap.\n");
+    }else if(siginfo->si_code == ILL_PRVOPC){
+        printf("\tPrivileged opcode.\n");
+    }else if(siginfo->si_code == ILL_PRVREG){
+        printf("\tPrivileged register.\n");
+    }else if(siginfo->si_code == ILL_COPROC){
+        printf("\tCoprocessor error.\n");
+    }else if(siginfo->si_code == ILL_BADSTK){
+        printf("\tInternal stack error.\n");
+    }else{
+        printf("\tUnknown si_code 0x%x%s\n", siginfo->si_code, (siginfo->si_code == SI_KERNEL) ? " (Matches SI_KERNEL)" : "");
+    }
+
+    ++(*rip);
+    printf("\tContinuing execution at %p\n", *rip);
+}
+
 bool has_signalhandler(const struct sigaction *const act){
     bool ret = 0;
     if((act->sa_flags & SA_SIGINFO) && (act->sa_sigaction != NULL)){
@@ -117,6 +148,7 @@ int main(int argc, char** argv){
     puts("Hello World");
 
     install_signalhandler(SIGSEGV, &sa_sigsegv);
+    install_signalhandler(SIGILL, &sa_sigill);
 
     asm volatile ("" : : : "memory"); // barrier (prevent reordering)
 
@@ -126,8 +158,11 @@ int main(int argc, char** argv){
     // the segfault handler should print the instruction which triggers the segfault
     // confirm by: $ objdump -d a.out | grep 0xdeadbeef
 
-    //asm ("cli" : : :); //TODO cli auses SIGSEGV??? wtf>
+    asm("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n" : : :); // nop slide
+    asm ("cli" : : :); //TODO cli auses SIGSEGV??? wtf>
+
     asm volatile ("" : : : "memory"); // barrier (prevent reordering)
+    asm("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n" : : :);
 
     puts("All went well. Bye.");
 }
