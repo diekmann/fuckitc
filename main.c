@@ -45,9 +45,12 @@ void sa_sigsegv(int signum, siginfo_t *siginfo, void *ucontext){
 
     if(siginfo->si_code == SEGV_MAPERR){
         printf("\tAddress not mapped to object.\n");
-    }else{
-        assert(siginfo->si_code == SEGV_ACCERR);
+    }else if(siginfo->si_code == SEGV_ACCERR){
         printf("\tInvalid permissions for mapped object.\n");
+    }
+    //well, my ubuntu man pages are not consistent with the kernel -_-
+    if(!(siginfo->si_code == SEGV_MAPERR || siginfo->si_code == SEGV_ACCERR || siginfo->si_code == SEGV_ACCERR /*|| siginfo->si_code == SEGV_PKUERR*/)){
+        printf("\tUnknown si_code 0x%x%s\n", siginfo->si_code, (siginfo->si_code == SI_KERNEL) ? " (Matches SI_KERNEL)" : "");
     }
 
     //TODO investigate different contexts
