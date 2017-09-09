@@ -20,6 +20,10 @@
 #error("Will likely not run on your arch")
 #endif
 
+#ifndef __ARCH_SI_TRAPNO
+#warning("si_trapno is a lie. Don't trust your man page.")
+#endif
+
 void * get_si_addr(const int signum, const siginfo_t *const siginfo){
     // si_addr only defined for certain signals
     assert(signum == SIGILL || signum == SIGFPE || signum == SIGSEGV || signum == SIGBUS || signum == SIGTRAP);
@@ -42,6 +46,7 @@ void sa_sigsegv(int signum, siginfo_t *siginfo, void *ucontext){
     assert(signum == SIGSEGV);
     greg_t *rip = get_pointer_to_saved_rip(ucontext);
     printf("Handling SIGSEGV. Invalid memory access to %p (Instruction pointer at %p)\n", get_si_addr(signum, siginfo), (void *)*rip);
+    printf("\tsi_errno %d\n", siginfo->si_errno);
 
     if(siginfo->si_code == SEGV_MAPERR){
         printf("\tAddress not mapped to object.\n");
@@ -51,7 +56,12 @@ void sa_sigsegv(int signum, siginfo_t *siginfo, void *ucontext){
     //well, my ubuntu man pages are not consistent with the kernel -_-
     if(!(siginfo->si_code == SEGV_MAPERR || siginfo->si_code == SEGV_ACCERR || siginfo->si_code == SEGV_ACCERR /*|| siginfo->si_code == SEGV_PKUERR*/)){
         printf("\tUnknown si_code 0x%x%s\n", siginfo->si_code, (siginfo->si_code == SI_KERNEL) ? " (Matches SI_KERNEL)" : "");
+        if(get_si_addr(signum, siginfo) == NULL){
+            printf("\t\tHey, this happened to me when I invoked a privileged instruction from user space. WTF? Why is this a SEGV? It should be general protection fault.\n");
+        }
     }
+
+    //printf("\tsi_trapno %d\n", siginfo->si_trapno); not available on my x86_64
 
     //TODO investigate different contexts
     //ucontext_t ucp = {0};
@@ -112,11 +122,11 @@ int main(int argc, char** argv){
 
     int *invalid_ptr = (int*)0x42;
     // trigger invalid memor address
-    //*invalid_ptr = 0xdeadbeef;
-    asm ("cli" : : :);
+    *invalid_ptr = 0xdeadbeef;
     // the segfault handler should print the instruction which triggers the segfault
     // confirm by: $ objdump -d a.out | grep 0xdeadbeef
 
+    //asm ("cli" : : :); //TODO cli auses SIGSEGV??? wtf>
     asm volatile ("" : : : "memory"); // barrier (prevent reordering)
 
     puts("All went well. Bye.");
