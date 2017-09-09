@@ -46,7 +46,7 @@ void sa_sigsegv(int signum, siginfo_t *siginfo, void *ucontext){
     assert(signum == SIGSEGV);
     greg_t *rip = get_pointer_to_saved_rip(ucontext);
     printf("Handling SIGSEGV. Invalid memory access to %p (Instruction pointer at %p)\n", get_si_addr(signum, siginfo), (void *)*rip);
-    printf("\tsi_errno %d\n", siginfo->si_errno);
+    printf("\tsi_errno %d (si_addr_lsb: 0x%hx)\n", siginfo->si_errno, siginfo->si_addr_lsb);
 
     if(siginfo->si_code == SEGV_MAPERR){
         printf("\tAddress not mapped to object.\n");
@@ -159,7 +159,8 @@ int main(int argc, char** argv){
     // confirm by: $ objdump -d a.out | grep 0xdeadbeef
 
     asm("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n" : : :); // nop slide
-    asm ("cli" : : :); //TODO cli auses SIGSEGV??? wtf>
+    asm ("cli" : : :); //TODO cli auses SIGSEGV??? wtf
+    // well, Kernel wants general protection faul, ... http://elixir.free-electrons.com/linux/v4.9/source/arch/x86/kernel/traps.c#L487
 
     asm volatile ("" : : : "memory"); // barrier (prevent reordering)
     asm("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n" : : :);
