@@ -110,7 +110,7 @@ int main(int argc, char** argv){
     int *invalid_ptr = (int*)0x42;
     // trigger invalid memor address
     //*invalid_ptr = 0xdeadbeef;
-    //asm ("cli" : : :);
+    asm ("cli" : : :);
     // the segfault handler should print the instruction which triggers the segfault
     // confirm by: $ objdump -d a.out | grep 0xdeadbeef
 
