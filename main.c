@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
-//__USE_GNU to get REG_RIP
+//__USE_GNU to get REG_RIP from /usr/include/x86_64-linux-gnu/sys/ucontext.h
+// uc_mcontext is architecture-specific
 #define __USE_GNU
 #include <ucontext.h>
 
@@ -24,10 +25,13 @@ void sa_sigsegv(int signum, siginfo_t *siginfo, void *ucontext_void){
     assert(signum == siginfo->si_signo);
     assert(signum == SIGSEGV);
 
-    // pointer to the place where the instruction pointer which triggered the SEGV is saved
-    void **rip = &uctx->uc_mcontext.gregs[REG_RIP];
+    // Pointer to the place where all the cpu registers were saved when the exception occured
+    gregset_t *saved_registers = &uctx->uc_mcontext.gregs;
+    // Pointer to the place where the instruction pointer which triggered the SEGV is saved
+    greg_t *rip = &(*saved_registers)[REG_RIP];
+    // We need "Pointer to" so we can modify the struct which will later be used to restore the state of the cpu
 
-    printf("Handling SIGSEGV. Invalid memory access to %p (Instruction pointer at %p)\n", siginfo->si_addr, *rip);
+    printf("Handling SIGSEGV. Invalid memory access to %p (Instruction pointer at %p)\n", siginfo->si_addr, (void *)*rip);
 
     // only for invalid_ptr exaple
     assert(siginfo->si_code == SEGV_MAPERR); // address not mapped
