@@ -52,16 +52,11 @@ void sa_sigsegv(int signum, siginfo_t *siginfo, void *ucontext){
         printf("\tAddress not mapped to object.\n");
     }else if(siginfo->si_code == SEGV_ACCERR){
         printf("\tInvalid permissions for mapped object.\n");
+    }else if(siginfo->si_code == SI_KERNEL){
+        printf("\tSent by the kernel. Likely a general protection fault on x86.\n");
+    }else{
+        printf("\tUnknown si_code 0x%x\n", siginfo->si_code);
     }
-    //well, my ubuntu man pages are not consistent with the kernel -_-
-    if(!(siginfo->si_code == SEGV_MAPERR || siginfo->si_code == SEGV_ACCERR || siginfo->si_code == SEGV_ACCERR /*|| siginfo->si_code == SEGV_PKUERR*/)){
-        printf("\tUnknown si_code 0x%x%s\n", siginfo->si_code, (siginfo->si_code == SI_KERNEL) ? " (Matches SI_KERNEL)" : "");
-        if(get_si_addr(signum, siginfo) == NULL){
-            printf("\t\tHey, this happened to me when I invoked a privileged instruction from user space. WTF? Why is this a SEGV? It should be general protection fault.\n");
-        }
-    }
-
-    //printf("\tsi_trapno %d\n", siginfo->si_trapno); not available on my x86_64
 
     //TODO investigate different contexts
     //ucontext_t ucp = {0};
@@ -159,8 +154,8 @@ int main(int argc, char** argv){
     // confirm by: $ objdump -d a.out | grep 0xdeadbeef
 
     asm("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n" : : :); // nop slide
-    asm ("cli" : : :); //TODO cli auses SIGSEGV??? wtf
-    // well, Kernel wants general protection faul, ... http://elixir.free-electrons.com/linux/v4.9/source/arch/x86/kernel/traps.c#L487
+    asm ("cli" : : :); // causes GPF on intel, kernel sends SIGSEGV
+    // http://elixir.free-electrons.com/linux/v4.9/source/arch/x86/kernel/traps.c#L487
 
     asm volatile ("" : : : "memory"); // barrier (prevent reordering)
     asm("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n" : : :);
