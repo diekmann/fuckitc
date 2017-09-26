@@ -9,6 +9,10 @@
 #include <assert.h>
 #include <stdbool.h>
 
+#include <sys/prctl.h>
+#include <linux/seccomp.h>
+#include <sys/syscall.h>
+
 #define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
                            } while (0)
 
@@ -145,6 +149,11 @@ int main(int argc, char** argv){
     install_signalhandler(SIGSEGV, &sa_sigsegv);
     install_signalhandler(SIGILL, &sa_sigill);
 
+    //prevent destroying system. Responsible YOLO.
+    doErrExit(prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0));
+    doErrExit(prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT, 0, 0, 0));
+
+
     asm volatile ("" : : : "memory"); // barrier (prevent reordering)
 
     int *invalid_ptr = (int*)0x42;
@@ -160,5 +169,8 @@ int main(int argc, char** argv){
     asm volatile ("" : : : "memory"); // barrier (prevent reordering)
     asm("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n" : : :);
 
+
     puts("All went well. Bye.");
+    syscall(SYS_exit, 0); //exit_group of glibc gets killed by seccomp
+    puts("WHY U NO EXIT?");
 }
